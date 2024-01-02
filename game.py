@@ -186,6 +186,5 @@ while running:
         camera.apply(sprite)
     sprite_group.draw(screen)
     hero_group.draw(screen)
-
     pygame.display.flip()
     clock.tick(FPS)
