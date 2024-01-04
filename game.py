@@ -110,13 +110,12 @@ class Enemy(Sprite):
     def __init__(self):
         super().__init__(all_sprites, enemy_group)
         self.type = ['zombie', 'skeleton'][random.randint(0, 1)]
-        self.image = pygame.transform.scale(load_image(f'enemy\skeleton\walk\left_walk1.png'),
+        self.image = pygame.transform.scale(load_image(f'enemy\{self.type}\walk\left_walk1.png'),
                                             tuple(map(lambda x: x // 2, list(size))))
         self.movement = [0, 0]
         self.direction = 'down'
         self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(20, 200) * random.choice([-1, 1])),
                                   (hero.pos[1] + random.randint(20, 200) * random.choice([-1, 1])))
-        print(self.pos_x, self.pos_y, hero.pos)
         self.rect = self.image.get_rect().move(self.pos_x, self.pos_y)
         self.pos = (self.pos_x, self.pos_y)
         self.step = 0
@@ -178,11 +177,11 @@ camera = Camera()
 # test_obj = pygame.sprite.Sprite(all_sprites)
 # test_obj.image = test
 # test_obj.rect = test_obj.image.get_rect()
-test = 0
+counter = 0
 
 while running:
-    test += 1
-    if test % (60 * 2) == 0:
+    counter += 1
+    if counter % (60 * 2) == 0:
         Enemy()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
