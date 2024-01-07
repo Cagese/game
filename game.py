@@ -110,35 +110,52 @@ class Enemy(Sprite):
     def __init__(self):
         super().__init__(all_sprites, enemy_group)
         self.type = ['zombie', 'skeleton'][random.randint(0, 1)]
+        self.size = tuple(map(lambda x: x // 2, list(size)))
         self.image = pygame.transform.scale(load_image(f'enemy\{self.type}\walk\left_walk1.png'),
-                                            tuple(map(lambda x: x // 2, list(size))))
-        self.movement = [0, 0]
-        self.direction = 'down'
-        self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(20, 200) * random.choice([-1, 1])),
-                                  (hero.pos[1] + random.randint(20, 200) * random.choice([-1, 1])))
+                                            self.size)
+        self.direction = 'left'
+        self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(50, 200) * random.choice([-1, 1])),
+                                  (hero.pos[1] + random.randint(50, 200) * random.choice([-1, 1])))
         self.rect = self.image.get_rect().move(self.pos_x, self.pos_y)
         self.pos = (self.pos_x, self.pos_y)
         self.step = 0
-
     def move(self, speed):
+        if len(pygame.sprite.spritecollide(self,enemy_group,False))!= 1:
+            speed = random.randrange(0,speed)
         x1, y1 = self.pos
         x2, y2 = hero.pos
         x2, y2 = x2 - hero.rect.w, y2 - hero.rect.h
-        if abs(x2 - x1) > 40:
-            if x1 > x2:
-                x1 -= speed
-            else:
-                x1 += speed
-        if abs(y2 - y1) > 40:
-            if y1 > y2:
-                y1 -= speed
-            else:
-                y1 += speed
+        def Ox():
+            nonlocal x1,x2,y1,y2,speed
+            if abs(x2 - x1) > 40:
+                if x1 > x2:
+                    self.direction = 'right'
+                    x1 -= speed
+                else:
+                    self.direction = 'left'
+                    x1 += speed
+            return x1
+        def Oy():
+            nonlocal x1, x2, y1, y2, speed
+            if abs(y2 - y1) > 40:
+                if y1 > y2:
+                    y1 -= speed
+                else:
+                    y1 += speed
+            return y1
+        if random.randint(0,1):
+            Ox()
+        else:
+            Oy()
+        enemy_animation(self, 'walk', 16, 6)
         self.pos = (x1, y1)
 
-
+def enemy_animation(enemy,type_move,enemy_fps,sprite_count):
+    enemy.step = (enemy.step + 1) % (sprite_count *sprite_count) + 1
+    direction = enemy.direction
+    enemy.image = pygame.transform.scale(load_image(f'enemy\{enemy.type}\{type_move}\{direction}_{type_move}{enemy.step//enemy_fps + 1}.png'),enemy.size)
 def move(size_obj):
-    speed = 5
+    speed = 8
     x, y = hero.pos
     movement = hero.movement
     x = movement[0] * speed + x
@@ -172,16 +189,12 @@ player_image = pygame.transform.scale(load_image('player/Character without weapo
 hero = Player(width // 2, height // 2)
 camera = Camera()
 
-# Тестовый объект для проверки отресовки спрайтов с учётом камеры (можно удалить)
-# test = pygame.transform.scale(load_image('player/Character without weapon/idle/idle down1.png'), (64, 64))
-# test_obj = pygame.sprite.Sprite(all_sprites)
-# test_obj.image = test
-# test_obj.rect = test_obj.image.get_rect()
+
 counter = 0
 
 while running:
     counter += 1
-    if counter % (60 * 2) == 0:
+    if counter % (FPS * 2) == 0:
         Enemy()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -210,7 +223,7 @@ while running:
     move(size)
     camera.update(hero)
     for sprite in enemy_group:
-        sprite.move(3)
+        sprite.move(5)
     for sprite in all_sprites:
         camera.apply(sprite)
     all_sprites.draw(screen)
