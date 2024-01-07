@@ -56,11 +56,14 @@ class Camera:
 
 # отслеживание нажатия клавиш и в какую сторону надо двигаться
 def movement_to_direction(movement):
-    if movement == [0, 1]:    return 'up'
-    if movement == [0, -1]:   return 'down'
-    if movement == [1, 0]:    return 'left'
-    if movement == [-1, 0]:   return 'right'
-
+    if movement == [0, 1]:
+        return 'up'
+    if movement == [0, -1]:
+        return 'down'
+    if movement == [1, 0]:
+        return 'left'
+    if movement == [-1, 0]:
+        return 'right'
 
 class Player(Sprite):
     def __init__(self, pos_x, pos_y):
@@ -69,11 +72,46 @@ class Player(Sprite):
         self.movement = [0, 0]
         self.direction = 'down'
         self.rect = self.image.get_rect().move(pos_x - size[0] // 2, pos_y - size[1] // 2)
+        self.hitboxes = []
+        self.is_attack = False
         self.pos = (pos_x - size[0] // 2, pos_y - size[1] // 2)
         self.pos_x, self.pos_y = pos_x, pos_y
         self.step = 0
 
+    def update_hitboxes(self):
+        base_hitbox = self.rect.copy().move(size[0]//2 -32,size[1]//2-32)
+        up_hitbox = base_hitbox.copy().move(0,-5)
+        down_hitbox = base_hitbox.copy().move(0, 5)
+        left_hitbox = base_hitbox.copy().move(-5, 0)
+        right_hitbox = base_hitbox.copy().move(5, 0)
+        self.hitboxes = list(zip([up_hitbox,down_hitbox,left_hitbox,right_hitbox],['up','down','left','right'],[(0,-10),(0,10),(-10,0),(10,0)]))
+        if debug:
+            pygame.draw.rect(screen,pygame.Color('yellow'),up_hitbox,width=5)
+            pygame.draw.rect(screen, pygame.Color('blue'), down_hitbox, width=5)
+            pygame.draw.rect(screen, pygame.Color('green'), left_hitbox, width=5)
+            pygame.draw.rect(screen, pygame.Color('purple'), right_hitbox, width=5)
+
+    def attack(self,size_obj):
+        attack_hitbox = self.rect.copy().move(size[0]//2 -32,size[1]//2-32)
+        for i in self.hitboxes:
+            if self.direction == i[1]:
+                attack_hitbox = i[0].copy().move(tuple(map(lambda x:x*2,i[2])))
+        if debug:
+            pygame.draw.rect(screen, pygame.Color('red'), attack_hitbox, width=5)
+        for enemy in enemy_group:
+            if attack_hitbox.colliderect(enemy.rect):
+
+                enemy.kill()
     def move(self, x, y, size_obj):
+        self.update_hitboxes()
+
+        if self.is_attack:
+            player_animation(self, 'attack', 'with sword and shield', 8, size_obj)
+            self.attack(size_obj)
+            return 0
+
+
+
         if sum(map(abs, self.movement)) == 0:
             player_animation(self, 'idle', 'with sword and shield', 16, size_obj)
         else:
@@ -81,7 +119,7 @@ class Player(Sprite):
             self.pos_x, self.pos_y = (x, y)
             player_animation(self, 'walk', 'with sword and shield', 16, size_obj)
 
-        self.update()
+
 
 
 def player_animation(player, type_move, type_sprite, player_fps, size_obj):
@@ -114,19 +152,30 @@ class Enemy(Sprite):
         self.image = pygame.transform.scale(load_image(f'enemy\{self.type}\walk\left_walk1.png'),
                                             self.size)
         self.direction = 'left'
-        self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(50, 200) * random.choice([-1, 1])),
-                                  (hero.pos[1] + random.randint(50, 200) * random.choice([-1, 1])))
+        self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(200, 500) * random.choice([-1, 1])),
+                                  (hero.pos[1] + random.randint(200, 500) * random.choice([-1, 1])))
         self.rect = self.image.get_rect().move(self.pos_x, self.pos_y)
+
+
         self.pos = (self.pos_x, self.pos_y)
         self.step = 0
+
     def move(self, speed):
-        if len(pygame.sprite.spritecollide(self,enemy_group,False))!= 1:
-            speed = random.randrange(0,speed)
+
+        if debug:
+            pygame.draw.rect(screen,(0,0,0),self.rect,width=5)
+
+
+        if len(pygame.sprite.spritecollide(self, enemy_group, False)) != 1:
+            speed = random.randrange(0, speed)
+
+
         x1, y1 = self.pos
         x2, y2 = hero.pos
         x2, y2 = x2 - hero.rect.w, y2 - hero.rect.h
+
         def Ox():
-            nonlocal x1,x2,y1,y2,speed
+            nonlocal x1, x2, y1, y2, speed
             if abs(x2 - x1) > 40:
                 if x1 > x2:
                     self.direction = 'right'
@@ -135,6 +184,7 @@ class Enemy(Sprite):
                     self.direction = 'left'
                     x1 += speed
             return x1
+
         def Oy():
             nonlocal x1, x2, y1, y2, speed
             if abs(y2 - y1) > 40:
@@ -143,17 +193,23 @@ class Enemy(Sprite):
                 else:
                     y1 += speed
             return y1
-        if random.randint(0,1):
+
+        if random.randint(0, 1):
             Ox()
         else:
             Oy()
         enemy_animation(self, 'walk', 16, 6)
         self.pos = (x1, y1)
 
-def enemy_animation(enemy,type_move,enemy_fps,sprite_count):
-    enemy.step = (enemy.step + 1) % (sprite_count *sprite_count) + 1
+
+def enemy_animation(enemy, type_move, enemy_fps, sprite_count):
+    enemy.step = (enemy.step + 1) % (sprite_count * sprite_count) + 1
     direction = enemy.direction
-    enemy.image = pygame.transform.scale(load_image(f'enemy\{enemy.type}\{type_move}\{direction}_{type_move}{enemy.step//enemy_fps + 1}.png'),enemy.size)
+    enemy.image = pygame.transform.scale(
+        load_image(f'enemy\{enemy.type}\{type_move}\{direction}_{type_move}{enemy.step // enemy_fps + 1}.png'),
+        enemy.size)
+
+
 def move(size_obj):
     speed = 8
     x, y = hero.pos
@@ -178,9 +234,12 @@ screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 screen_size = width, height = (pygame.display.get_surface().get_width(), pygame.display.get_surface().get_height())
 
 clock = pygame.time.Clock()
+pygame.time.set_timer(pygame.USEREVENT,1000)
+
 all_sprites = SpriteGroup()
 hero_group = SpriteGroup()
 enemy_group = SpriteGroup()
+
 
 FPS = 60
 running = True
@@ -189,16 +248,28 @@ player_image = pygame.transform.scale(load_image('player/Character without weapo
 hero = Player(width // 2, height // 2)
 camera = Camera()
 
+debug = False
 
 counter = 0
+counter_font = pygame.font.SysFont('Consolas', 60)
 
 while running:
-    counter += 1
-    if counter % (FPS * 2) == 0:
-        Enemy()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.USEREVENT:
+            counter += 1
+            Enemy()
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                hero.is_attack = True
+            elif event.button == 3:
+                print('right')
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                hero.is_attack = False
+            elif event.button == 3:
+                print('right')
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 running = False
@@ -224,10 +295,15 @@ while running:
     camera.update(hero)
     for sprite in enemy_group:
         sprite.move(5)
+
+
     for sprite in all_sprites:
         camera.apply(sprite)
     all_sprites.draw(screen)
     hero_group.draw(screen)
+
+    screen.blit(counter_font.render(str(counter),True,(155,0,0,100)),(width//2 - 16,height//4))
+
 
     pygame.display.flip()
 
