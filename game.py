@@ -65,43 +65,48 @@ def movement_to_direction(movement):
     if movement == [-1, 0]:
         return 'right'
 
+
 class Player(Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(all_sprites, hero_group)
         self.image = player_image
+        self.rect = self.image.get_rect().move(pos_x - size[0] // 2, pos_y - size[1] // 2)
+
         self.movement = [0, 0]
         self.direction = 'down'
-        self.rect = self.image.get_rect().move(pos_x - size[0] // 2, pos_y - size[1] // 2)
-        self.hitboxes = []
-        self.is_attack = False
         self.pos = (pos_x - size[0] // 2, pos_y - size[1] // 2)
         self.pos_x, self.pos_y = pos_x, pos_y
+
+        self.hitboxes = []
+        self.is_attack = False
+
         self.step = 0
 
     def update_hitboxes(self):
-        base_hitbox = self.rect.copy().move(size[0]//2 -32,size[1]//2-32)
-        up_hitbox = base_hitbox.copy().move(0,-5)
+        base_hitbox = self.rect.copy().move(size[0] // 2 - 32, size[1] // 2 - 32)
+        up_hitbox = base_hitbox.copy().move(0, -5)
         down_hitbox = base_hitbox.copy().move(0, 5)
         left_hitbox = base_hitbox.copy().move(-5, 0)
         right_hitbox = base_hitbox.copy().move(5, 0)
-        self.hitboxes = list(zip([up_hitbox,down_hitbox,left_hitbox,right_hitbox],['up','down','left','right'],[(0,-10),(0,10),(-10,0),(10,0)]))
+        self.hitboxes = list(zip([up_hitbox, down_hitbox, left_hitbox, right_hitbox], ['up', 'down', 'left', 'right'],
+                                 [(0, -10), (0, 10), (-10, 0), (10, 0)]))
         if debug:
-            pygame.draw.rect(screen,pygame.Color('yellow'),up_hitbox,width=5)
+            pygame.draw.rect(screen, pygame.Color('yellow'), up_hitbox, width=5)
             pygame.draw.rect(screen, pygame.Color('blue'), down_hitbox, width=5)
             pygame.draw.rect(screen, pygame.Color('green'), left_hitbox, width=5)
             pygame.draw.rect(screen, pygame.Color('purple'), right_hitbox, width=5)
 
-    def attack(self,size_obj):
-        attack_hitbox = self.rect.copy().move(size[0]//2 -32,size[1]//2-32)
+    def attack(self, size_obj):
+        attack_hitbox = self.rect.copy().move(size[0] // 2 - 32, size[1] // 2 - 32)
         for i in self.hitboxes:
             if self.direction == i[1]:
-                attack_hitbox = i[0].copy().move(tuple(map(lambda x:x*2,i[2])))
+                attack_hitbox = i[0].copy().move(tuple(map(lambda x: x * 2, i[2])))
         if debug:
             pygame.draw.rect(screen, pygame.Color('red'), attack_hitbox, width=5)
         for enemy in enemy_group:
             if attack_hitbox.colliderect(enemy.rect):
-
                 enemy.kill()
+
     def move(self, x, y, size_obj):
         self.update_hitboxes()
 
@@ -110,16 +115,12 @@ class Player(Sprite):
             self.attack(size_obj)
             return 0
 
-
-
         if sum(map(abs, self.movement)) == 0:
             player_animation(self, 'idle', 'with sword and shield', 16, size_obj)
         else:
             self.pos = (x, y)
             self.pos_x, self.pos_y = (x, y)
             player_animation(self, 'walk', 'with sword and shield', 16, size_obj)
-
-
 
 
 def player_animation(player, type_move, type_sprite, player_fps, size_obj):
@@ -151,24 +152,29 @@ class Enemy(Sprite):
         self.size = tuple(map(lambda x: x // 2, list(size)))
         self.image = pygame.transform.scale(load_image(f'enemy\{self.type}\walk\left_walk1.png'),
                                             self.size)
+
         self.direction = 'left'
         self.pos_x, self.pos_y = ((hero.pos[0] + random.randint(200, 500) * random.choice([-1, 1])),
                                   (hero.pos[1] + random.randint(200, 500) * random.choice([-1, 1])))
         self.rect = self.image.get_rect().move(self.pos_x, self.pos_y)
-
-
         self.pos = (self.pos_x, self.pos_y)
+
+        global enemy_max_health
+        self.max_hp = enemy_max_health
+        self.hp = enemy_max_health
+
         self.step = 0
+
+    def take_damage(self,damage):
+        self.hp -= damage
 
     def move(self, speed):
 
         if debug:
-            pygame.draw.rect(screen,(0,0,0),self.rect,width=5)
-
+            pygame.draw.rect(screen, (0, 0, 0), self.rect, width=5)
 
         if len(pygame.sprite.spritecollide(self, enemy_group, False)) != 1:
-            speed = random.randrange(0, speed)
-
+            speed = random.randint(0, speed)
 
         x1, y1 = self.pos
         x2, y2 = hero.pos
@@ -234,24 +240,26 @@ screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 screen_size = width, height = (pygame.display.get_surface().get_width(), pygame.display.get_surface().get_height())
 
 clock = pygame.time.Clock()
-pygame.time.set_timer(pygame.USEREVENT,1000)
+pygame.time.set_timer(pygame.USEREVENT, 1000)
 
 all_sprites = SpriteGroup()
 hero_group = SpriteGroup()
 enemy_group = SpriteGroup()
 
-
 FPS = 60
 running = True
-background = load_image(f'ground/{random.randint(1, 6)}.png')
+background = load_image(f'ground/{random.randint(1, 98)}.png')
 player_image = pygame.transform.scale(load_image('player/Character without weapon/idle/idle down1.png'), (64, 64))
 hero = Player(width // 2, height // 2)
 camera = Camera()
 
-debug = False
+debug = True
 
 counter = 0
 counter_font = pygame.font.SysFont('Consolas', 60)
+
+enemy_max_health = 100
+
 
 while running:
     for event in pygame.event.get():
@@ -259,6 +267,9 @@ while running:
             running = False
         elif event.type == pygame.USEREVENT:
             counter += 1
+            if counter % 30 == 0:
+                enemy_max_health *= 1.2
+                print(enemy_max_health)
             Enemy()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
@@ -296,14 +307,12 @@ while running:
     for sprite in enemy_group:
         sprite.move(5)
 
-
     for sprite in all_sprites:
         camera.apply(sprite)
     all_sprites.draw(screen)
     hero_group.draw(screen)
 
-    screen.blit(counter_font.render(str(counter),True,(155,0,0,100)),(width//2 - 16,height//4))
-
+    screen.blit(counter_font.render(str(counter), True, (155, 0, 0, 100)), (width // 2 - 16, height // 4))
 
     pygame.display.flip()
 
