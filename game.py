@@ -1,6 +1,7 @@
 import pygame
 import os
 import random
+from PIL import Image
 
 from pygame.sprite import Sprite
 
@@ -25,7 +26,6 @@ def load_image(name, color_key=None):
             color_key = image.get_at((0, 0))
         image.set_colorkey(color_key)
     return image
-
 
 class SpriteGroup(pygame.sprite.Group):
 
@@ -84,10 +84,23 @@ class Player(Sprite):
 
     def update_hitboxes(self):
         base_hitbox = self.rect.copy().move(size[0] // 2 - 32, size[1] // 2 - 32)
+        print(base_hitbox)
         up_hitbox = base_hitbox.copy().move(0, -5)
+        up_hitbox.y -= 10
+        up_hitbox.h = 16
+
         down_hitbox = base_hitbox.copy().move(0, 5)
+        down_hitbox.y += down_hitbox.h-5
+        down_hitbox.h = 16
+
         left_hitbox = base_hitbox.copy().move(-5, 0)
+        left_hitbox.w = 16
+        left_hitbox.x -= 10
+
         right_hitbox = base_hitbox.copy().move(5, 0)
+        right_hitbox.x += right_hitbox.w-5
+        right_hitbox.w = 16
+
         self.hitboxes = list(zip([up_hitbox, down_hitbox, left_hitbox, right_hitbox], ['up', 'down', 'left', 'right'],
                                  [(0, -10), (0, 10), (-10, 0), (10, 0)]))
         if debug:
@@ -105,7 +118,7 @@ class Player(Sprite):
             pygame.draw.rect(screen, pygame.Color('red'), attack_hitbox, width=5)
         for enemy in enemy_group:
             if attack_hitbox.colliderect(enemy.rect):
-                enemy.kill()
+                enemy.take_damage(50)
 
     def move(self, x, y, size_obj):
         self.update_hitboxes()
@@ -162,16 +175,35 @@ class Enemy(Sprite):
         global enemy_max_health
         self.max_hp = enemy_max_health
         self.hp = enemy_max_health
+        self.show_healthbar = False
+        self.immunity = 0
 
         self.step = 0
 
     def take_damage(self,damage):
-        self.hp -= damage
+        print(self.immunity)
+        if self.immunity <= 0:
+            self.hp -= damage
+            if self.hp <= 0:
+                self.kill()
+            self.show_healthbar = True
+            self.immunity = 1
+        else:
+            if counter % 2 == 0:
+                self.immunity -= 1
+
+
 
     def move(self, speed):
 
         if debug:
             pygame.draw.rect(screen, (0, 0, 0), self.rect, width=5)
+
+        if self.show_healthbar:
+            healthbar = self.rect.copy()
+            healthbar.h = 5
+            healthbar.w = self.rect.w - self.hp
+            pygame.draw.rect(screen, (255, 0, 0, 150), healthbar)
 
         if len(pygame.sprite.spritecollide(self, enemy_group, False)) != 1:
             speed = random.randint(0, speed)
@@ -270,7 +302,8 @@ while running:
             if counter % 30 == 0:
                 enemy_max_health *= 1.2
                 print(enemy_max_health)
-            Enemy()
+            if counter % 2 == 0 and len(enemy_group) <= 100:
+                Enemy()
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 hero.is_attack = True
