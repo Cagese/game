@@ -27,6 +27,7 @@ def load_image(name, color_key=None):
         image.set_colorkey(color_key)
     return image
 
+
 class SpriteGroup(pygame.sprite.Group):
 
     def __init__(self):
@@ -84,21 +85,18 @@ class Player(Sprite):
 
     def update_hitboxes(self):
         base_hitbox = self.rect.copy().move(size[0] // 2 - 32, size[1] // 2 - 32)
-        print(base_hitbox)
         up_hitbox = base_hitbox.copy().move(0, -5)
-        up_hitbox.y -= 10
         up_hitbox.h = 16
 
         down_hitbox = base_hitbox.copy().move(0, 5)
-        down_hitbox.y += down_hitbox.h-5
+        down_hitbox.y += down_hitbox.h - 16
         down_hitbox.h = 16
 
         left_hitbox = base_hitbox.copy().move(-5, 0)
         left_hitbox.w = 16
-        left_hitbox.x -= 10
 
         right_hitbox = base_hitbox.copy().move(5, 0)
-        right_hitbox.x += right_hitbox.w-5
+        right_hitbox.x += right_hitbox.w - 16
         right_hitbox.w = 16
 
         self.hitboxes = list(zip([up_hitbox, down_hitbox, left_hitbox, right_hitbox], ['up', 'down', 'left', 'right'],
@@ -180,8 +178,7 @@ class Enemy(Sprite):
 
         self.step = 0
 
-    def take_damage(self,damage):
-        print(self.immunity)
+    def take_damage(self, damage):
         if self.immunity <= 0:
             self.hp -= damage
             if self.hp <= 0:
@@ -191,8 +188,6 @@ class Enemy(Sprite):
         else:
             if counter % 2 == 0:
                 self.immunity -= 1
-
-
 
     def move(self, speed):
 
@@ -292,7 +287,6 @@ counter_font = pygame.font.SysFont('Consolas', 60)
 
 enemy_max_health = 100
 
-
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -301,7 +295,6 @@ while running:
             counter += 1
             if counter % 30 == 0:
                 enemy_max_health *= 1.2
-                print(enemy_max_health)
             if counter % 2 == 0 and len(enemy_group) <= 100:
                 Enemy()
         elif event.type == pygame.MOUSEBUTTONDOWN:
