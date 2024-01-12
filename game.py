@@ -83,6 +83,9 @@ class Player(Sprite):
         self.immunity = 0
         self.max_hp = 100
         self.hp = 100
+        self.xp = 0
+        self.reg = 0.01
+        self.strength = 25
 
         self.step = 0
 
@@ -109,6 +112,7 @@ class Player(Sprite):
             pygame.draw.rect(screen, pygame.Color('blue'), down_hitbox, width=5)
             pygame.draw.rect(screen, pygame.Color('green'), left_hitbox, width=5)
             pygame.draw.rect(screen, pygame.Color('purple'), right_hitbox, width=5)
+
     def take_damage(self, damage):
         if self.immunity <= 0:
             self.hp -= damage
@@ -129,7 +133,7 @@ class Player(Sprite):
             pygame.draw.rect(screen, pygame.Color('red'), attack_hitbox, width=5)
         for enemy in enemy_group:
             if attack_hitbox.colliderect(enemy.hitbox):
-                enemy.take_damage(50)
+                enemy.take_damage(self.strength)
 
     def move(self, x, y, size_obj):
         self.update_hitboxes()
@@ -137,13 +141,20 @@ class Player(Sprite):
         if self.hp > 0:
             healthbar = self.hitboxes[0][0].copy()
             healthbar.h = 5
-            healthbar.y -=10
+            healthbar.y -= 10
             healthbar_background = healthbar.copy()
             healthbar_background.h = 5
-            healthbar.w = self.rect.w * (self.hp/self.max_hp)
+            healthbar.w = self.rect.w * (self.hp / self.max_hp)
             pygame.draw.rect(screen, (128, 128, 128), healthbar_background)
             pygame.draw.rect(screen, (255, 0, 0), healthbar)
-
+        if self.xp > 100:
+            self.xp -= 100
+            global choice_upgrade
+            choice_upgrade = True
+        if self.hp != self.max_hp:
+            self.hp += self.reg
+        if self.hp > self.max_hp:
+            self.hp = self.max_hp
 
         if self.is_attack:
             player_animation(self, 'attack', 'with sword and shield', 8, size_obj)
@@ -217,9 +228,10 @@ class Enemy(Sprite):
         else:
             if self.immunity_start_time + self.immunity <= counter:
                 self.immunity = 0
+
     def attack(self):
         if self.type == 'skeleton':
-            enemy_animation(self,'attack',120,4)
+            enemy_animation(self, 'attack', 120, 4)
         elif self.type == 'zombie':
             enemy_animation(self, 'attack', 120, 8)
         hero.take_damage(enemy_strength)
@@ -232,21 +244,21 @@ class Enemy(Sprite):
     def move(self, speed):
         self.update_hitbox()
 
-
         if debug:
             pygame.draw.rect(screen, (0, 0, 0), self.hitbox, width=5)
 
-
         if self.dead:
             if self.type == 'skeleton':
-                if not(self.step%5 + 1 == 5):
+                if not (self.step % 5 + 1 == 5):
                     enemy_animation(self, 'dead', 120, 5)
                 else:
+                    hero.xp += 100
                     self.kill()
             elif self.type == 'zombie':
-                if not(self.step%8 + 1 == 8):
+                if not (self.step % 8 + 1 == 8):
                     enemy_animation(self, 'dead', 120, 8)
                 else:
+                    hero.xp += 100
                     self.kill()
             return 0
 
@@ -255,10 +267,9 @@ class Enemy(Sprite):
             healthbar.h = 5
             healthbar_background = self.rect.copy()
             healthbar_background.h = 5
-            healthbar.w = self.rect.w * (self.hp/self.max_hp)
+            healthbar.w = self.rect.w * (self.hp / self.max_hp)
             pygame.draw.rect(screen, (128, 128, 128), healthbar_background)
             pygame.draw.rect(screen, (255, 0, 0), healthbar)
-
 
         for i in hero.hitboxes:
             if self.hitbox.colliderect(i[0]):
@@ -306,11 +317,24 @@ def enemy_animation(enemy, type_move, enemy_tick, sprite_count):
         enemy.last_update = now
         enemy.step = (enemy.step + 1) % sprite_count
 
-
     direction = enemy.direction
     enemy.image = pygame.transform.scale(
         load_image(f'enemy\{enemy.type}\{type_move}\{direction}_{type_move}{enemy.step % sprite_count + 1}.png'),
         enemy.size)
+
+
+class Gui_book(Sprite):
+    def __init__(self):
+        super().__init__(GUI_group)
+        self.size = size
+        self.image = pygame.transform.scale_by(load_image(f'GUI\Book.png'),8)
+
+        self.rect = self.image.get_rect().move(self.image.get_width()//4,
+                                               self.image.get_height()//4)
+        self.hp_rect = self.rect.copy()
+        self.hp_rect.w //=2
+        self.att_rect = self.hp_rect.copy()
+        self.att_rect.x += self.hp_rect.w
 
 
 def move(size_obj):
@@ -342,6 +366,7 @@ pygame.time.set_timer(pygame.USEREVENT, 1000)
 all_sprites = SpriteGroup()
 hero_group = SpriteGroup()
 enemy_group = SpriteGroup()
+GUI_group = SpriteGroup()
 
 FPS = 60
 running = True
@@ -354,23 +379,34 @@ debug = True
 
 counter = 0
 counter_font = pygame.font.SysFont('Consolas', 60)
+stat_font = pygame.font.SysFont('Consolas', 40)
 
 enemy_max_health = 100
 enemy_strength = 10
 difficulty = 20
 
+choice_upgrade = False
+book = Gui_book()
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.USEREVENT:
+        elif event.type == pygame.USEREVENT and not choice_upgrade:
             counter += 1
             if counter % 30 == 0:
-                enemy_max_health *= 1 + difficulty/100
-                enemy_strength *= 1 + difficulty/100
+                enemy_max_health *= 1 + (difficulty*1.5) / 100
+                enemy_strength *= 1 + (difficulty*1.5) / 100
             if counter % 2 == 0 and len(enemy_group) <= 100:
                 Enemy()
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1 and choice_upgrade:
+                if book.hp_rect.collidepoint(event.pos):
+                    hero.max_hp *= 1 + difficulty/100
+                    hero.reg *= 1 + difficulty/100
+                elif book.att_rect.collidepoint(event.pos):
+                    hero.strength *= 1 + difficulty/100
+                choice_upgrade = False
             if event.button == 1:
                 hero.is_attack = True
             elif event.button == 3:
@@ -400,20 +436,25 @@ while running:
                 hero.movement[0] = 0
             elif event.key == pygame.K_d:
                 hero.movement[0] = 0
-    generate_background()
-    move(size)
-    camera.update(hero)
-    for sprite in enemy_group:
-        sprite.move(5)
 
+    generate_background()
     for sprite in all_sprites:
         camera.apply(sprite)
-    all_sprites.draw(screen)
-    hero_group.draw(screen)
-
     screen.blit(counter_font.render(str(counter), True, (155, 0, 0, 100)), (width // 2 - 16, height // 4))
+    all_sprites.draw(screen)
+    screen.blit(stat_font.render(f'max hp:{str(round(hero.max_hp))} hp reg:{str(round(hero.reg * 100))} att:{str(round(hero.strength))}', True, (255, 255, 255)), (10, 0))
+
+    if not choice_upgrade:
+        move(size)
+        camera.update(hero)
+        for sprite in enemy_group:
+
+            sprite.move(5)
+    else:
+        GUI_group.draw(screen)
+
+
+
 
     pygame.display.flip()
-
     clock.tick(FPS)
-    print(hero.immunity)
