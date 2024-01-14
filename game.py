@@ -1,10 +1,9 @@
 import pygame
 import os
 import random
-from PIL import Image
 
 from pygame.sprite import Sprite
-
+pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512, devicename=None)
 pygame.init()
 
 
@@ -65,11 +64,13 @@ def movement_to_direction(movement):
         return 'left'
     if movement == [-1, 0]:
         return 'right'
+    return 'down'
 
 
 class Player(Sprite):
     def __init__(self, pos_x, pos_y):
         super().__init__(all_sprites, hero_group)
+
         self.image = player_image
         self.rect = self.image.get_rect().move(pos_x - size[0] // 2, pos_y - size[1] // 2)
 
@@ -80,12 +81,14 @@ class Player(Sprite):
 
         self.hitboxes = []
         self.is_attack = False
+        self.is_block = False
         self.immunity = 0
+        self.immunity_start_time = 0
         self.max_hp = 100
         self.hp = 100
         self.xp = 0
         self.reg = 0.01
-        self.strength = 25
+        self.strength = 50
 
         self.step = 0
 
@@ -116,8 +119,6 @@ class Player(Sprite):
     def take_damage(self, damage):
         if self.immunity <= 0:
             self.hp -= damage
-            if self.hp <= 0:
-                self.kill()
             self.immunity = 2
             self.immunity_start_time = counter
         else:
@@ -134,6 +135,10 @@ class Player(Sprite):
         for enemy in enemy_group:
             if attack_hitbox.colliderect(enemy.hitbox):
                 enemy.take_damage(self.strength)
+        if self.step % FPS == 0:
+            s = pygame.mixer.Sound(f'data/sound/attack/hero_attack_{random.randint(1,2)}.wav')
+            s.set_volume(0.4)
+            s.play()
 
     def move(self, x, y, size_obj):
         self.update_hitboxes()
@@ -156,6 +161,11 @@ class Player(Sprite):
         if self.hp > self.max_hp:
             self.hp = self.max_hp
 
+        if self.is_block:
+            player_animation(self, 'block', 'with sword and shield', 0, size_obj)
+            self.immunity = 5
+            return 0
+
         if self.is_attack:
             player_animation(self, 'attack', 'with sword and shield', 8, size_obj)
             self.attack()
@@ -170,6 +180,14 @@ class Player(Sprite):
 
 
 def player_animation(player, type_move, type_sprite, player_fps, size_obj):
+    if player_fps == 0:
+        if sum(map(abs, player.movement)) != 0:
+            player.direction = movement_to_direction(player.movement)
+        player.image = pygame.transform.scale(
+            load_image(
+                f'player\Character {type_sprite}\{type_move}\{type_move} {player.direction}.png'),
+            size_obj)
+        return 0
     player.step = (player.step + 1) % (player_fps * 4)
     if sum(map(abs, player.movement)) == 2:
         if player.movement[1] == 1:
@@ -252,13 +270,13 @@ class Enemy(Sprite):
                 if not (self.step % 5 + 1 == 5):
                     enemy_animation(self, 'dead', 120, 5)
                 else:
-                    hero.xp += 100
+                    hero.xp += 10
                     self.kill()
             elif self.type == 'zombie':
                 if not (self.step % 8 + 1 == 8):
                     enemy_animation(self, 'dead', 120, 8)
                 else:
-                    hero.xp += 100
+                    hero.xp += 10
                     self.kill()
             return 0
 
@@ -282,7 +300,10 @@ class Enemy(Sprite):
         x1, y1 = self.pos
         x2, y2 = hero.pos
         x2, y2 = x2 - hero.rect.w, y2 - hero.rect.h
-
+        if (x2 -x1) ** 2 + (y2 - y1)**2 < 1200 ** 2:
+            speed = 5
+        else:
+            speed = 20
         def Ox():
             nonlocal x1, x2, y1, y2, speed
             if abs(x2 - x1) > 40:
@@ -327,12 +348,12 @@ class Gui_book(Sprite):
     def __init__(self):
         super().__init__(GUI_group)
         self.size = size
-        self.image = pygame.transform.scale_by(load_image(f'GUI\Book.png'),8)
+        self.image = pygame.transform.scale_by(load_image(f'GUI\Book.png'), 8)
 
-        self.rect = self.image.get_rect().move(self.image.get_width()//4,
-                                               self.image.get_height()//4)
+        self.rect = self.image.get_rect().move(self.image.get_width() // 4,
+                                               self.image.get_height() // 4)
         self.hp_rect = self.rect.copy()
-        self.hp_rect.w //=2
+        self.hp_rect.w //= 2
         self.att_rect = self.hp_rect.copy()
         self.att_rect.x += self.hp_rect.w
 
@@ -355,106 +376,166 @@ def generate_background():
             screen.blit(background, (x, y))
 
 
-map_size = (100, 100)
-size = (256, 256)
-screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-screen_size = width, height = (pygame.display.get_surface().get_width(), pygame.display.get_surface().get_height())
+def main():
+    global map_size, size, width, height, screen, all_sprites, hero_group, hero, enemy_group, GUI_group, FPS, choice_upgrade
+    global camera, debug, enemy_strength, enemy_max_health, counter, screen_size, hero_group, background, player_image
+    map_size = (100, 100)
+    size = (256, 256)
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen_size = width, height = (pygame.display.get_surface().get_width(), pygame.display.get_surface().get_height())
 
-clock = pygame.time.Clock()
-pygame.time.set_timer(pygame.USEREVENT, 1000)
+    clock = pygame.time.Clock()
+    pygame.time.set_timer(pygame.USEREVENT, 1000)
 
-all_sprites = SpriteGroup()
-hero_group = SpriteGroup()
-enemy_group = SpriteGroup()
-GUI_group = SpriteGroup()
+    all_sprites = SpriteGroup()
+    hero_group = SpriteGroup()
+    enemy_group = SpriteGroup()
+    GUI_group = SpriteGroup()
 
-FPS = 60
-running = True
-background = load_image(f'ground/{random.randint(1, 98)}.png')
-player_image = pygame.transform.scale(load_image('player/Character without weapon/idle/idle down1.png'), (64, 64))
-hero = Player(width // 2, height // 2)
-camera = Camera()
+    FPS = 60
+    running = True
+    background = load_image(f'ground/{random.randint(1, 98)}.png')
+    player_image = pygame.transform.scale(load_image('player/Character with sword and shield/idle/idle down1.png'), (64, 64))
+    hero = Player(width // 2, height // 2)
+    camera = Camera()
 
-debug = True
+    debug = False
 
-counter = 0
-counter_font = pygame.font.SysFont('Consolas', 60)
-stat_font = pygame.font.SysFont('Consolas', 40)
+    counter = 0
+    counter_font = pygame.font.SysFont('Consolas', 60)
+    stat_font = pygame.font.SysFont('Consolas', 40)
 
-enemy_max_health = 100
-enemy_strength = 10
-difficulty = 20
+    enemy_max_health = 100
+    enemy_strength = 10
+    difficulty = 20
 
-choice_upgrade = False
-book = Gui_book()
+    choice_upgrade = False
+    show_stat = False
+    death_screen = False
+    start_screen = True
+    book = Gui_book()
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.USEREVENT and not choice_upgrade:
-            counter += 1
-            if counter % 30 == 0:
-                enemy_max_health *= 1 + (difficulty*1.5) / 100
-                enemy_strength *= 1 + (difficulty*1.5) / 100
-            if counter % 2 == 0 and len(enemy_group) <= 100:
-                Enemy()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1 and choice_upgrade:
-                if book.hp_rect.collidepoint(event.pos):
-                    hero.max_hp *= 1 + difficulty/100
-                    hero.reg *= 1 + difficulty/100
-                elif book.att_rect.collidepoint(event.pos):
-                    hero.strength *= 1 + difficulty/100
-                choice_upgrade = False
-            if event.button == 1:
-                hero.is_attack = True
-            elif event.button == 3:
-                print('right')
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                hero.is_attack = False
-            elif event.button == 3:
-                print('right')
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+    pygame.mixer.music.load(f"data/sound/ambients/Ambient {random.randint(1,10)}.ogg")
+    pygame.mixer.music.play(-1)
+    pygame.mixer.music.set_volume(0.3)
+
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 running = False
-            elif event.key == pygame.K_w:
-                hero.movement[1] = 1
-            elif event.key == pygame.K_s:
-                hero.movement[1] = -1
-            elif event.key == pygame.K_a:
-                hero.movement[0] = 1
-            elif event.key == pygame.K_d:
-                hero.movement[0] = -1
-        elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_w:
-                hero.movement[1] = 0
-            elif event.key == pygame.K_s:
-                hero.movement[1] = 0
-            elif event.key == pygame.K_a:
-                hero.movement[0] = 0
-            elif event.key == pygame.K_d:
-                hero.movement[0] = 0
+            elif event.type == pygame.USEREVENT and not any([choice_upgrade, death_screen,start_screen]):
+                counter += 1
+                if counter % 60 == 0:
+                    enemy_max_health *= 1 + (difficulty * 1.5) / 100
+                    enemy_strength *= 1 + (difficulty * 1.5) / 100
+                if counter % 2 == 0 and len(enemy_group) <= 100:
+                    Enemy()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1 and choice_upgrade:
+                    if book.hp_rect.collidepoint(event.pos):
+                        hero.max_hp *= 1 + difficulty / 100
+                        hero.reg *= 1 + difficulty / 100
+                        choice_upgrade = False
+                    elif book.att_rect.collidepoint(event.pos):
+                        hero.strength *= 1 + difficulty / 100
+                        choice_upgrade = False
+                if event.button == 1:
+                    hero.is_attack = True
+                elif event.button == 3:
+                    hero.is_block = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    hero.is_attack = False
+                elif event.button == 3:
+                    hero.is_block = False
+            elif event.type == pygame.KEYDOWN:
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_LCTRL] and keys[pygame.K_LALT] and keys[pygame.K_d]:
+                    debug = not debug
+                if event.key == pygame.K_ESCAPE and not start_screen:
+                    if not death_screen:
+                        death_screen = True
+                    else:
+                        running = False
+                elif event.key == pygame.K_c:
+                    show_stat = not show_stat
+                elif event.key == pygame.K_w:
+                    hero.movement[1] = 1
+                elif event.key == pygame.K_s:
+                    hero.movement[1] = -1
+                elif event.key == pygame.K_a:
+                    hero.movement[0] = 1
+                elif event.key == pygame.K_d:
+                    hero.movement[0] = -1
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_w:
+                    hero.movement[1] = 0
+                elif event.key == pygame.K_s:
+                    hero.movement[1] = 0
+                elif event.key == pygame.K_a:
+                    hero.movement[0] = 0
+                elif event.key == pygame.K_d:
+                    hero.movement[0] = 0
 
-    generate_background()
-    for sprite in all_sprites:
-        camera.apply(sprite)
-    screen.blit(counter_font.render(str(counter), True, (155, 0, 0, 100)), (width // 2 - 16, height // 4))
-    all_sprites.draw(screen)
-    screen.blit(stat_font.render(f'max hp:{str(round(hero.max_hp))} hp reg:{str(round(hero.reg * 100))} att:{str(round(hero.strength))}', True, (255, 255, 255)), (10, 0))
+        if hero.hp <= 0:
+            death_screen = True
 
-    if not choice_upgrade:
-        move(size)
-        camera.update(hero)
-        for sprite in enemy_group:
+        if death_screen:
+            stat_file = open('data/stat.txt')
+            try:
+                last_counter = int(stat_file.read())
+            except ValueError:
+                last_counter = 0
+            last_counter = max(last_counter,counter)
 
-            sprite.move(5)
-    else:
-        GUI_group.draw(screen)
+            screen.fill((0, 0, 0))
+            death_text = stat_font.render(f'Вы прожили {counter} секунд. рекорд:{last_counter}', True, (255, 255, 255))
+            screen.blit(death_text, (width // 2 - death_text.get_width() // 2, height // 2))
+            esc_text = stat_font.render(f'Нажмите escape для выхода в главное меню', True, (255, 255, 255))
+            screen.blit(esc_text, (width // 2 - esc_text.get_width() // 2, height // 2 + 40))
 
 
 
+            stat_file = open('data/stat.txt',mode='w')
+            stat_file.write(str(last_counter))
+        elif start_screen:
+            screen.fill((0,0,0))
 
-    pygame.display.flip()
-    clock.tick(FPS)
+            movement_text = stat_font.render(f'Управление - wasd, ЛКМ - атаковать,', True, (255, 255, 255))
+            screen.blit(movement_text, (width // 2 - movement_text.get_width() // 2, height // 2 - 20))
+            movement_text = stat_font.render(f'ПКМ - использовать щит, C - показать харатеристуку персонажа', True,
+                                             (255, 255, 255))
+            screen.blit(movement_text, (width // 2 - movement_text.get_width() // 2, height // 2 + 20))
+            movement_text = stat_font.render(f'нажмите любую кнопку управление для начала', True,
+                                             (255, 255, 255))
+            screen.blit(movement_text, (width // 2 - movement_text.get_width() // 2, height // 2 + 60))
+
+
+
+            if sum(map(abs,hero.movement))!= 0:
+                start_screen = False
+        else:
+            generate_background()
+            for sprite in all_sprites:
+                camera.apply(sprite)
+            counter_rect = counter_font.render(str(counter), True, (255, 255, 255))
+            screen.blit(counter_rect, (width // 2 - counter_rect.get_width()//2, height // 4))
+            all_sprites.draw(screen)
+            if show_stat:
+                screen.blit(stat_font.render(
+                    f'max hp:{str(round(hero.max_hp))} hp reg:{str(round(hero.reg * 100))} att:{str(round(hero.strength))} xp:{str(hero.xp)}',
+                    True, (255, 255, 255)), (10, 0))
+            if not choice_upgrade:
+                move(size)
+                camera.update(hero)
+                for sprite in enemy_group:
+                    sprite.move(5)
+            else:
+                GUI_group.draw(screen)
+            if debug:
+                hero.hp = hero.max_hp
+
+        pygame.display.flip()
+        clock.tick(FPS)
+    pygame.mixer.music.stop()
