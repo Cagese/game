@@ -3,6 +3,7 @@ import os
 import random
 
 from pygame.sprite import Sprite
+
 pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512, devicename=None)
 pygame.init()
 
@@ -136,7 +137,7 @@ class Player(Sprite):
             if attack_hitbox.colliderect(enemy.hitbox):
                 enemy.take_damage(self.strength)
         if self.step % FPS == 0:
-            s = pygame.mixer.Sound(f'data/sound/attack/hero_attack_{random.randint(1,2)}.wav')
+            s = pygame.mixer.Sound(f'data/sound/attack/hero_attack_{random.randint(1, 2)}.wav')
             s.set_volume(0.4)
             s.play()
 
@@ -300,10 +301,11 @@ class Enemy(Sprite):
         x1, y1 = self.pos
         x2, y2 = hero.pos
         x2, y2 = x2 - hero.rect.w, y2 - hero.rect.h
-        if (x2 -x1) ** 2 + (y2 - y1)**2 < 1200 ** 2:
+        if (x2 - x1) ** 2 + (y2 - y1) ** 2 < 1200 ** 2:
             speed = 5
         else:
             speed = 20
+
         def Ox():
             nonlocal x1, x2, y1, y2, speed
             if abs(x2 - x1) > 40:
@@ -395,7 +397,8 @@ def main():
     FPS = 60
     running = True
     background = load_image(f'ground/{random.randint(1, 98)}.png')
-    player_image = pygame.transform.scale(load_image('player/Character with sword and shield/idle/idle down1.png'), (64, 64))
+    player_image = pygame.transform.scale(load_image('player/Character with sword and shield/idle/idle down1.png'),
+                                          (64, 64))
     hero = Player(width // 2, height // 2)
     camera = Camera()
 
@@ -415,16 +418,15 @@ def main():
     start_screen = True
     book = Gui_book()
 
-    pygame.mixer.music.load(f"data/sound/ambients/Ambient {random.randint(1,10)}.ogg")
+    pygame.mixer.music.load(f"data/sound/ambients/Ambient {random.randint(1, 10)}.ogg")
     pygame.mixer.music.play(-1)
     pygame.mixer.music.set_volume(0.3)
-
 
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.USEREVENT and not any([choice_upgrade, death_screen,start_screen]):
+            elif event.type == pygame.USEREVENT and not any([choice_upgrade, death_screen, start_screen]):
                 counter += 1
                 if counter % 60 == 0:
                     enemy_max_health *= 1 + (difficulty * 1.5) / 100
@@ -487,7 +489,7 @@ def main():
                 last_counter = int(stat_file.read())
             except ValueError:
                 last_counter = 0
-            last_counter = max(last_counter,counter)
+            last_counter = max(last_counter, counter)
 
             screen.fill((0, 0, 0))
             death_text = stat_font.render(f'Вы прожили {counter} секунд. рекорд:{last_counter}', True, (255, 255, 255))
@@ -495,12 +497,10 @@ def main():
             esc_text = stat_font.render(f'Нажмите escape для выхода в главное меню', True, (255, 255, 255))
             screen.blit(esc_text, (width // 2 - esc_text.get_width() // 2, height // 2 + 40))
 
-
-
-            stat_file = open('data/stat.txt',mode='w')
+            stat_file = open('data/stat.txt', mode='w')
             stat_file.write(str(last_counter))
         elif start_screen:
-            screen.fill((0,0,0))
+            screen.fill((0, 0, 0))
 
             movement_text = stat_font.render(f'Управление - wasd, ЛКМ - атаковать,', True, (255, 255, 255))
             screen.blit(movement_text, (width // 2 - movement_text.get_width() // 2, height // 2 - 20))
@@ -511,16 +511,14 @@ def main():
                                              (255, 255, 255))
             screen.blit(movement_text, (width // 2 - movement_text.get_width() // 2, height // 2 + 60))
 
-
-
-            if sum(map(abs,hero.movement))!= 0:
+            if sum(map(abs, hero.movement)) != 0:
                 start_screen = False
         else:
             generate_background()
             for sprite in all_sprites:
                 camera.apply(sprite)
             counter_rect = counter_font.render(str(counter), True, (255, 255, 255))
-            screen.blit(counter_rect, (width // 2 - counter_rect.get_width()//2, height // 4))
+            screen.blit(counter_rect, (width // 2 - counter_rect.get_width() // 2, height // 4))
             all_sprites.draw(screen)
             if show_stat:
                 screen.blit(stat_font.render(
